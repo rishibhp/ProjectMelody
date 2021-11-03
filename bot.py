@@ -1,7 +1,7 @@
 import discord
 
 # TODO: Move to a separate file
-TOKEN = "OTA1NDk2NzMzMDE3MDU1MzIy.YYK7jA.xDQG56HS2KQT6q_Jdvj4rfX_7h4"
+TOKEN = "OTA1NDk2NzMzMDE3MDU1MzIy.YYK7jA.gMwm60xlrtLscfh77_rPMeMZg0k"
 GUILD_NAME = "MelodyTest"
 
 client = discord.Client()
