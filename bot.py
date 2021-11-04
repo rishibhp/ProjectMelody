@@ -7,24 +7,42 @@ GUILD_NAME = "MelodyTest"
 
 bot = commands.Bot(command_prefix="!")
 
+
 @bot.command(name="test")
 async def test(ctx):
+    """Test command"""
     await ctx.send("it worked!")
 
-# TODO: py -3 -m pip install -U discord.py[voice]
+
 @bot.command()
 async def join(ctx):
-    # TODO: handle cases where the bot is already connected to another voice channel and other user attempts to 
-    # make the bot join (should send a message saying "This bot is already in use!")
-    try:
+    """Command to have bot join the voice channel that the user is in"""
+    if len(bot.voice_clients) > 0:
+        # Indicates bot is already in a voice channel
+        await ctx.send("This bot is already in use!")
+    elif ctx.author.voice is not None:
+        # Making sure that the user themself is in a voice channel
         channel = ctx.author.voice.channel
         await channel.connect()
-    except Exception:
+    else:
         await ctx.send("Please join one of the voice channels first!")
+
+
+@bot.command()
+async def leave(ctx):
+    """ Command to have bot leave a voice channel (if is currently in one) """
+    if len(bot.voice_clients) == 0:
+        await ctx.send("There are no channels for me to leave from!")
+    else:
+        # Assuming the bot will only every be in one voice channel at mo
+        await bot.voice_clients[0].disconnect()
+
 
 # :)
 # @bot.command()
 # async def rick(ctx):
-#     await ctx.send("https://tenor.com/view/rickroll-roll-rick-never-gonna-give-you-up-never-gonna-gif-22954713")
+#     await ctx.send(
+#     "https://tenor.com/view/rickroll-roll-rick-never-gonna-give-you-up-never-gonna-gif-22954713")
+
 
 bot.run(TOKEN)
