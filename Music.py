@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from ytGateway import yt_search
 
+
 REPLY_COLOR = discord.Color.dark_blue()
 
 
@@ -13,7 +14,7 @@ def playing_message(query_results):
                           title=query_results['title'],
                           color=REPLY_COLOR)
     return embed
-
+  
 
 class Music(commands.Cog):
 
@@ -26,6 +27,7 @@ class Music(commands.Cog):
                                'options': '-vn'}
         self.playing_queue = []
 
+
     def bot_in_vc(self):
         return len(self.bot.voice_clients) > 0
 
@@ -34,7 +36,7 @@ class Music(commands.Cog):
         """Command to have bot join the voice channel that the user is in"""
         if self.bot_in_vc():
             # Indicates bot is already in a voice channel
-            await ctx.send("Sorry, I am already in a voice channel")
+            await ctx.send("This bot is already in use!")
         elif ctx.author.voice is not None:
             # Making sure that the user themself is in a voice channel
             channel = ctx.author.voice.channel
@@ -96,6 +98,7 @@ class Music(commands.Cog):
         channel = self.bot.voice_clients[0]
         channel.pause()
         await ctx.send("**Playing paused** :pause_button:")
+
 
     @commands.command(help="Have Melody resume playing")
     async def resume(self, ctx):
