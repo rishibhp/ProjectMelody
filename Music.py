@@ -79,19 +79,27 @@ class Music(commands.Cog):
         for i in range(len(self.playing_queue)):
             track_title = self.trim_title(self.playing_queue[i][1])
             track_len = self.format_seconds(self.playing_queue[i][4])
-            return_message += f"\n{i + 1:>2}) {track_title:<40} {track_len:>10}"
-        footer = f"\nLoop queue: {self.bool_to_emoji(self.loop)} | " \
+            return_message += f"\n{i + 1:>2}) " \
+                              f"{track_title:<{MAX_TITLE_LENGTH}} " \
+                              f"{track_len:>10}"
+            # above is so that that tracks are aligned properly
+        footer = f"\n\nLoop queue: {self.bool_to_emoji(self.loop)} | " \
                  f"Loop track: {self.bool_to_emoji(self.loop_track)}"
+        # footer indicates whether there is any looping
         return return_message + footer + "```"
 
     @staticmethod
     def trim_title(title: str) -> str:
+        """ Trims title to be at most MAX_TITLE_LENGTH characters, replacing
+        last 3 characters with ... if necessary"""
         if len(title) < MAX_TITLE_LENGTH:
             return title
         return title[:MAX_TITLE_LENGTH - 3] + "..."
 
     @staticmethod
     def format_seconds(seconds: int) -> str:
+        """ Returns string representation of seconds in minutes:seconds format
+        (minutes is allowed be greater than 60)"""
         m, s = divmod(seconds, 60)
         return f"{m}:{str(s).zfill(2)}"
 
@@ -116,10 +124,80 @@ class Music(commands.Cog):
             await ctx.send("There are no channels for me to leave from!")
         else:
             # Assuming the bot will only every be in one voice channel at most
-            self.bot.voice_clients[0].stop()
+            ctx.voice_client.pause()
+            await ctx.voice_client.disconnect()
             self.playing_queue = []
             await ctx.send(random.choice(LEAVE_MESSAGES))
-            await self.bot.voice_clients[0].disconnect()
+
+    @staticmethod
+    def bool_to_emoji(bool_val: bool) -> str:
+        """ Converts a boolean value into an emoji """
+        if bool_val:
+            return "✅"
+        else:
+            return "❌"
+
+    @commands.command(aliases=["lt"], help="Loop the current track")
+    async def looptrack(self, ctx: commands.Context) -> None:
+        """ Command to loop the current track (or the first one in queue) """
+        self.loop_track = not self.loop_track
+        await ctx.send("Looping track: " + self.bool_to_emoji(self.loop_track))
+
+    @commands.command(aliases=["loop", "l", "loopqueue", "lq"],
+                      help="Loop the queue")
+    async def loop_command(self, ctx: commands.Context) -> None:
+        """ Command to loop the queue in order """
+        self.loop = not self.loop
+        await ctx.send("Queue loop: " + self.bool_to_emoji(self.loop))
+
+    @commands.command()
+    async def shuffle(self, ctx: commands.Context):
+        ctx.voice_client.pause()
+        random.shuffle(self.playing_queue)
+        self.play_song(ctx, self.playing_queue[0])
+
+    @commands.command(help="Pause whatever Melody is playing")
+    async def pause(self, ctx: commands.Context) -> None:
+        """Command to pause what is playing"""
+        if not self.bot_in_vc():
+            await ctx.send("I don't think I was playing anything, "
+                           "but I'll stop anyway :persevere:")
+            return
+
+        ctx.voice_client.pause()
+        await ctx.send("**Playing paused** :pause_button:")
+
+    @commands.command(help="Have Melody resume playing")
+    async def resume(self, ctx: commands.Context) -> None:
+        """Command to resume playing"""
+        if not self.bot_in_vc():
+            await ctx.send("Um I don't think I am in a vc? "
+                           "But um I guess I will continue playing silence")
+            return
+
+        ctx.voice_client.resume()
+        await ctx.send("**Playing resumed** :arrow_forward:")
+
+    @commands.command(aliases=["s", "next", "n"], help="Skip the current track")
+    async def skip(self, ctx: commands.Context) -> None:
+        """ Command to skip the current track """
+        await self.jump(ctx, "1")
+
+    @commands.command(aliases=["j"])
+    async def jump(self, ctx: commands.Context, pos: str) -> None:
+        """ Jump to a specific track in a queue, index from 1 """
+        ctx.voice_client.pause()
+        pos = int(pos)
+
+        self.playing_queue = self.playing_queue[pos - 1:]
+        self.play_song(ctx, self.playing_queue[0])
+
+    @commands.command(aliases=["clearqueue", "cq"], help="Clear queue")
+    async def clear_queue(self, ctx: commands.Context):
+        """ Commands to clear the queue """
+        ctx.voice_client.pause()
+        self.playing_queue = []
+        await ctx.send("Queue cleared")
 
     @staticmethod
     def bool_to_emoji(bool_val: bool) -> str:
@@ -180,7 +258,6 @@ class Music(commands.Cog):
         # Currently we instantly download anything that is added to queue.
         # Can likely be made more efficient
         if len(args) == 0:
-            # queue_embed = discord.Embed(description=self.format_queue())
             await ctx.send(self.format_queue())
             return
         self.download_audio(args, ctx.author.display_name)
@@ -195,7 +272,7 @@ class Music(commands.Cog):
             # it joins the appropriate one
             await self.join(ctx)
 
-        client = self.bot.voice_clients[0]
+        client = ctx.voice_client
 
         if client.is_paused():
             await self.resume(ctx)
@@ -210,22 +287,23 @@ class Music(commands.Cog):
             # Ensure that there is something in the queue
             await self.queue(ctx, *args)
 
-        self.play_song(ctx, client, self.playing_queue[0])
+        self.play_song(ctx, self.playing_queue[0])
 
     def play_song(self, ctx: commands.Context,
-                  client: discord.VoiceClient,
                   audio_data: Tuple) -> None:
         """
         Plays the song in audio_data in client and sends a message to the
         channel relaying this information
         :param ctx: context of request
-        :param client: VoiceClient where track is to be played
         :param audio_data: Tuple containing information about the track
         (see self.playing_queue for details)
         :return: None
         """
+        client = ctx.voice_client
 
         def after_playing(error):
+            if isinstance(error, IndexError):
+                return
             if not self.loop_track:
                 track_data = self.playing_queue.pop(0)
                 if self.loop:
@@ -233,7 +311,7 @@ class Music(commands.Cog):
 
             if len(self.playing_queue) > 0:
                 # Play next song if available
-                self.play_song(ctx, client, self.playing_queue[0])
+                self.play_song(ctx, self.playing_queue[0])
 
         asyncio.run_coroutine_threadsafe(
             ctx.send(embed=playing_message(*audio_data[1:4])),
