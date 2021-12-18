@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Tuple
 
 import discord
 from discord.ext import commands
@@ -49,7 +49,6 @@ def queue_message(vid_title: str, vid_url: str, requester_name: str) \
 
 
 class Music(commands.Cog):
-
     def __init__(self, bot):
         self.bot = bot
         self.FFMPEG_OPTIONS = {'before_options':
@@ -130,14 +129,15 @@ class Music(commands.Cog):
 
     def play_song(self, ctx: commands.Context,
                   client: discord.VoiceClient,
-                  audio_data: List):
+                  audio_data: Tuple) -> None:
         """
         Plays the song in audio_data in client and sends a message to the
         channel relaying this information
-        :param ctx:
-        :param client:
-        :param audio_data:
-        :return:
+        :param ctx: context of request
+        :param client: VoiceClient where track is to be played
+        :param audio_data: Tuple containing information about the track
+        (see self.playing_queue for details)
+        :return: None
         """
 
         def after_playing(error):
@@ -153,9 +153,12 @@ class Music(commands.Cog):
         client.play(audio_data[0], after=after_playing)
 
     def download_audio(self, search_args: Tuple[str], requester: str) -> None:
-        """This function downloads the result from search_args
-        :param search_args: the arguments for the search, as provided by user
-        :param requester: String representing the nickname of the requester
+        """
+        This method downloads the result from search_args and saves it and
+        its information to self.playing_queue
+        :param search_args: Search arguments as provided by user
+        :param requester: Discord (nick)name of requester
+        :return: None
         """
         query_results = yt_search(" ".join(search_args))
 
@@ -164,6 +167,7 @@ class Music(commands.Cog):
             return
 
         url = query_results["source"]
+        # download audio and save it and its information in self.playing_queue
         self.playing_queue.append(
             (
                 discord.FFmpegPCMAudio(url, **self.FFMPEG_OPTIONS),
@@ -174,7 +178,7 @@ class Music(commands.Cog):
         )
 
     @commands.command(help="Pause whatever Melody is playing")
-    async def pause(self, ctx):
+    async def pause(self, ctx: commands.Context) -> None:
         """Command to pause what is playing"""
         if not self.bot_in_vc():
             await ctx.send("I don't think I was playing anything, "
@@ -186,7 +190,7 @@ class Music(commands.Cog):
         await ctx.send("**Playing paused** :pause_button:")
 
     @commands.command(help="Have Melody resume playing")
-    async def resume(self, ctx):
+    async def resume(self, ctx: commands.Context) -> None:
         """Command to resume playing"""
         if not self.bot_in_vc():
             await ctx.send("Um I don't think I am in a vc? "
