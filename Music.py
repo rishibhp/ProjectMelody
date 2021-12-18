@@ -83,7 +83,6 @@ class Music(commands.Cog):
                               f"{track_title:<{MAX_TITLE_LENGTH}} " \
                               f"{track_len:>10}"
             # above is so that that tracks are aligned properly
-
         footer = f"\n\nLoop queue: {self.bool_to_emoji(self.loop)} | " \
                  f"Loop track: {self.bool_to_emoji(self.loop_track)}"
         # footer indicates whether there is any looping
@@ -200,6 +199,59 @@ class Music(commands.Cog):
         self.playing_queue = []
         await ctx.send("Queue cleared")
 
+    @staticmethod
+    def bool_to_emoji(bool_val: bool) -> str:
+        """ Converts a boolean value into an emoji """
+        if bool_val:
+            return "✅"
+        else:
+            return "❌"
+
+    @commands.command(aliases=["lt"], help="Loop the current track")
+    async def looptrack(self, ctx: commands.Context) -> None:
+        """ Command to loop the current track (or the first one in queue) """
+        self.loop_track = not self.loop_track
+        await ctx.send("Looping track: " + self.bool_to_emoji(self.loop_track))
+
+    @commands.command(aliases=["loop", "l", "loopqueue", "lq"],
+                      help="Loop the queue")
+    async def loop_command(self, ctx: commands.Context) -> None:
+        """ Command to loop the queue in order """
+        self.loop = not self.loop
+        await ctx.send("Queue loop: " + self.bool_to_emoji(self.loop))
+
+    @commands.command(help="Pause whatever Melody is playing")
+    async def pause(self, ctx: commands.Context) -> None:
+        """Command to pause what is playing"""
+        if not self.bot_in_vc():
+            await ctx.send("I don't think I was playing anything, "
+                           "but I'll stop anyway :persevere:")
+            return
+
+        channel = self.bot.voice_clients[0]
+        channel.pause()
+        await ctx.send("**Playing paused** :pause_button:")
+
+    @commands.command(help="Have Melody resume playing")
+    async def resume(self, ctx: commands.Context) -> None:
+        """Command to resume playing"""
+        if not self.bot_in_vc():
+            await ctx.send("Um I don't think I am in a vc? "
+                           "But um I guess I will continue playing silence")
+            return
+
+        channel = self.bot.voice_clients[0]
+
+        channel.resume()
+        await ctx.send("**Playing resumed** :arrow_forward:")
+
+    @commands.command(aliases=["clearqueue", "cq"], help="Clear queue")
+    async def clear_queue(self, ctx: commands.Context):
+        """ Commands to clear the queue """
+        self.bot.voice_clients[0].stop()
+        self.playing_queue = []
+        await ctx.send("Queue cleared")
+
     @commands.command(aliases=["q"], help="Add a track to the queue")
     async def queue(self, ctx: commands.Context, *args: str) -> None:
         """ Command to add items to the queue """
@@ -250,7 +302,6 @@ class Music(commands.Cog):
         client = ctx.voice_client
 
         def after_playing(error):
-            print([a[1] for a in self.playing_queue])
             if isinstance(error, IndexError):
                 return
             if not self.loop_track:
