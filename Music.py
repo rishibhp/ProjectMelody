@@ -47,6 +47,7 @@ def queue_message(vid_title: str, vid_url: str, requester_name: str) \
                           title=vid_title,
                           color=REPLY_COLOR)
     return embed
+# TODO: We can can likely combine the above two methods, given their similarity
 
 
 class Music(commands.Cog):
@@ -123,10 +124,9 @@ class Music(commands.Cog):
         if not self.bot_in_vc():
             await ctx.send("There are no channels for me to leave from!")
         else:
-            # Assuming the bot will only every be in one voice channel at most
             ctx.voice_client.pause()
             await ctx.voice_client.disconnect()
-            self.playing_queue = []
+            self.playing_queue = []  # reset queue
             await ctx.send(random.choice(LEAVE_MESSAGES))
 
     @staticmethod
@@ -150,7 +150,7 @@ class Music(commands.Cog):
         self.loop = not self.loop
         await ctx.send("Queue loop: " + self.bool_to_emoji(self.loop))
 
-    @commands.command()
+    @commands.command(help="Shuffle queue")
     async def shuffle(self, ctx: commands.Context):
         ctx.voice_client.pause()
         random.shuffle(self.playing_queue)
@@ -181,7 +181,7 @@ class Music(commands.Cog):
     @commands.command(aliases=["s", "next", "n"], help="Skip the current track")
     async def skip(self, ctx: commands.Context) -> None:
         """ Command to skip the current track """
-        await self.jump(ctx, "1")
+        await self.jump(ctx, "2")
 
     @commands.command(aliases=["j"])
     async def jump(self, ctx: commands.Context, pos: str) -> None:
@@ -192,20 +192,12 @@ class Music(commands.Cog):
         self.playing_queue = self.playing_queue[pos - 1:]
         self.play_song(ctx, self.playing_queue[0])
 
-    @commands.command(aliases=["clearqueue", "cq"], help="Clear queue")
+    @commands.command(name="clearqueue", aliases=["cq"], help="Clear queue")
     async def clear_queue(self, ctx: commands.Context):
         """ Commands to clear the queue """
         ctx.voice_client.pause()
         self.playing_queue = []
         await ctx.send("Queue cleared")
-
-    @staticmethod
-    def bool_to_emoji(bool_val: bool) -> str:
-        """ Converts a boolean value into an emoji """
-        if bool_val:
-            return "✅"
-        else:
-            return "❌"
 
     @commands.command(aliases=["lt"], help="Loop the current track")
     async def looptrack(self, ctx: commands.Context) -> None:

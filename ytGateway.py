@@ -15,8 +15,6 @@ def yt_search(query):
                     "duration": info["duration"]}
         except IndexError as e:
             # This means extract_info returned an empty list
-            # TODO?: Better error handling? We can directly check if
-            # the list is empty or not
             return
 
 
