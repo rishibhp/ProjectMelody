@@ -3,6 +3,19 @@ from discord.ext import commands
 from ytGateway import yt_search
 
 
+REPLY_COLOR = discord.Color.dark_blue()
+
+
+def playing_message(query_results):
+    vid_url = f"https://www.youtube.com/watch?v={query_results['id']}"
+    message = "**Now Playing**\n" + vid_url
+    embed = discord.Embed(url=vid_url,
+                          description=message,
+                          title=query_results['title'],
+                          color=REPLY_COLOR)
+    return embed
+  
+
 class Music(commands.Cog):
 
     def __init__(self, bot):
@@ -12,7 +25,8 @@ class Music(commands.Cog):
                                '-reconnect_streamed 1 '
                                '-reconnect_delay_max 5',
                                'options': '-vn'}
-        self.queue = []
+        self.playing_queue = []
+
 
     def bot_in_vc(self):
         return len(self.bot.voice_clients) > 0
@@ -37,7 +51,8 @@ class Music(commands.Cog):
         if not self.bot_in_vc():
             await ctx.send("There are no channels for me to leave from!")
         else:
-            # Assuming the bot will only every be in one voice channel at mo
+            # Assuming the bot will only every be in one voice channel at most
+            await ctx.send("Adios amigos :wave:")
             await self.bot.voice_clients[0].disconnect()
 
     @commands.command(aliases=["p"], help="Get Melody to play something")
@@ -60,8 +75,7 @@ class Music(commands.Cog):
             await ctx.send("I don't know what to play :confounded:")
             return
 
-        query = " ".join(args)
-        query_results = yt_search(query)
+        query_results = yt_search(" ".join(args))
 
         if query_results is None:
             # Make sure search actually returned something
@@ -71,10 +85,7 @@ class Music(commands.Cog):
         url = query_results["source"]
         channel.play(discord.FFmpegPCMAudio(url, **self.FFMPEG_OPTIONS))
 
-        # TODO: Have a better message
-        # url above is a bit funky so we manually create the youtube link
-        await ctx.send(f"Playing {query_results['title']}: "
-                       f"https://www.youtube.com/watch?v={query_results['id']}")
+        await ctx.send(embed=playing_message(query_results))
 
     @commands.command(help="Pause whatever Melody is playing")
     async def pause(self, ctx):
@@ -86,8 +97,8 @@ class Music(commands.Cog):
 
         channel = self.bot.voice_clients[0]
         channel.pause()
-        # TODO: Have a better message?
-        await ctx.send("Playing paused")
+        await ctx.send("**Playing paused** :pause_button:")
+
 
     @commands.command(help="Have Melody resume playing")
     async def resume(self, ctx):
@@ -100,4 +111,4 @@ class Music(commands.Cog):
         channel = self.bot.voice_clients[0]
 
         channel.resume()
-        await ctx.send("Playing resumed")
+        await ctx.send("**Playing resumed** :arrow_forward:")
