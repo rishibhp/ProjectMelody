@@ -10,10 +10,15 @@ def yt_search(query):
             info = ytdl.extract_info(f"ytsearch:{query}",
                                      download=False)['entries'][0]
             return {"source": info["formats"][0]["url"],
-                    "id": info["id"],
-                    "title": info["title"]}
+                    "url": info["webpage_url"],
+                    "title": info["title"],
+                    "duration": info["duration"]}
         except IndexError as e:
             # This means extract_info returned an empty list
             # TODO?: Better error handling? We can directly check if
             # the list is empty or not
             return
+
+
+if __name__ == "__main__":
+    print(yt_search("hello"))

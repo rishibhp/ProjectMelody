@@ -12,6 +12,7 @@ LEAVE_MESSAGES = ["Adios amigos :wave:",
                   "Hasta la vista :spy:",
                   "Bye :wave:",
                   "See you later!"]
+MAX_TITLE_LENGTH = 40  # max num characters in track title when displaying queue
 
 
 def playing_message(vid_title: str, vid_url: str, requester_name: str) \
@@ -52,9 +53,9 @@ class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.FFMPEG_OPTIONS = {'before_options':
-                               '-reconnect 1 '
-                               '-reconnect_streamed 1 '
-                               '-reconnect_delay_max 5',
+                                   '-reconnect 1 '
+                                   '-reconnect_streamed 1 '
+                                   '-reconnect_delay_max 5',
                                'options': '-vn'}
 
         # Each element in self.playing_queue is a tuple of 4 objects:
@@ -62,10 +63,33 @@ class Music(commands.Cog):
         # 1. String object for the video title
         # 2. String object for the video url
         # 3. String object for the requester's nickname
+        # 4. Integer representing length of track in seconds
         self.playing_queue = []
 
     def bot_in_vc(self):
         return len(self.bot.voice_clients) > 0
+
+    def format_queue(self) -> str:
+        if len(self.playing_queue) == 0:
+            return "Empty queue!"
+
+        return_message = "```md"
+        for i in range(len(self.playing_queue)):
+            track_title = self.trim_title(self.playing_queue[i][1])
+            track_len = self.format_seconds(self.playing_queue[i][4])
+            return_message += f"\n{i + 1:>2}) {track_title:<40} {track_len:>10}"
+        return return_message + "```"
+
+    @staticmethod
+    def trim_title(title: str) -> str:
+        if len(title) < MAX_TITLE_LENGTH:
+            return title
+        return title[:MAX_TITLE_LENGTH - 3] + "..."
+
+    @staticmethod
+    def format_seconds(seconds: int) -> str:
+        m, s = divmod(seconds, 60)
+        return f"{m}:{s}"
 
     @commands.command(help="Have Melody join a voice channel")
     async def join(self, ctx: commands.Context) -> None:
@@ -88,6 +112,7 @@ class Music(commands.Cog):
             await ctx.send("There are no channels for me to leave from!")
         else:
             # Assuming the bot will only every be in one voice channel at most
+            self.playing_queue = []
             await ctx.send(random.choice(LEAVE_MESSAGES))
             await self.bot.voice_clients[0].disconnect()
 
@@ -95,10 +120,19 @@ class Music(commands.Cog):
     async def queue(self, ctx: commands.Context, *args: str) -> None:
         """ Command to add items to the queue """
         # TODO: Add functionality to view the queue
-        # Currently we instantly download that is added to queue.
+        # Currently we instantly download anything that is added to queue.
         # Can likely be made more efficient
+        if len(args) == 0:
+            # queue_embed = discord.Embed(description=self.format_queue())
+            await ctx.send(self.format_queue())
+            return
         self.download_audio(args, ctx.author.display_name)
-        await ctx.send(embed=queue_message(*self.playing_queue[-1][-3:]))
+        await ctx.send(embed=queue_message(*self.playing_queue[-1][1:4]))
+
+    @commands.command(aliases=["clearqueue", "cq"])
+    async def clear_queue(self, ctx):
+        self.playing_queue = []
+        await ctx.send("Queue cleared")
 
     @commands.command(aliases=["p"], help="Get Melody to play something")
     async def play(self, ctx: commands.Context, *args: str) -> None:
@@ -124,7 +158,7 @@ class Music(commands.Cog):
             # Ensure that there is something in the queue
             await self.queue(ctx, *args)
 
-        audio_data = self.playing_queue.pop()
+        audio_data = self.playing_queue[0]
         self.play_song(ctx, client, audio_data)
 
     def play_song(self, ctx: commands.Context,
@@ -141,12 +175,13 @@ class Music(commands.Cog):
         """
 
         def after_playing(error):
+            self.playing_queue.pop(0)
             if len(self.playing_queue) > 0:
                 # Play next song if available
-                self.play_song(ctx, client, self.playing_queue.pop())
+                self.play_song(ctx, client, self.playing_queue[0])
 
         asyncio.run_coroutine_threadsafe(
-            ctx.send(embed=playing_message(*audio_data[1:])),
+            ctx.send(embed=playing_message(*audio_data[1:4])),
             self.bot.loop
         )
 
@@ -166,14 +201,15 @@ class Music(commands.Cog):
             # Make sure search actually returned something
             return
 
-        url = query_results["source"]
+        source = query_results["source"]
         # download audio and save it and its information in self.playing_queue
         self.playing_queue.append(
             (
-                discord.FFmpegPCMAudio(url, **self.FFMPEG_OPTIONS),
+                discord.FFmpegPCMAudio(source, **self.FFMPEG_OPTIONS),
                 query_results["title"],
-                "https://www.youtube.com/watch?v=" + query_results["id"],
-                requester
+                query_results["url"],
+                requester,
+                query_results["duration"]
             )
         )
 
