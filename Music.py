@@ -53,10 +53,12 @@ class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.FFMPEG_OPTIONS = {'before_options':
-                                   '-reconnect 1 '
-                                   '-reconnect_streamed 1 '
-                                   '-reconnect_delay_max 5',
+                               '-reconnect 1 '
+                               '-reconnect_streamed 1 '
+                               '-reconnect_delay_max 5',
                                'options': '-vn'}
+        self.loop_track = False
+        self.loop = False
 
         # Each element in self.playing_queue is a tuple of 4 objects:
         # 0. discord.FFmpegPCMAudio object for the audio itself
@@ -78,7 +80,9 @@ class Music(commands.Cog):
             track_title = self.trim_title(self.playing_queue[i][1])
             track_len = self.format_seconds(self.playing_queue[i][4])
             return_message += f"\n{i + 1:>2}) {track_title:<40} {track_len:>10}"
-        return return_message + "```"
+        footer = f"\nLoop queue: {self.bool_to_emoji(self.loop)} | " \
+                 f"Loop track: {self.bool_to_emoji(self.loop_track)}"
+        return return_message + footer + "```"
 
     @staticmethod
     def trim_title(title: str) -> str:
@@ -89,7 +93,7 @@ class Music(commands.Cog):
     @staticmethod
     def format_seconds(seconds: int) -> str:
         m, s = divmod(seconds, 60)
-        return f"{m}:{s}"
+        return f"{m}:{str(s).zfill(2)}"
 
     @commands.command(help="Have Melody join a voice channel")
     async def join(self, ctx: commands.Context) -> None:
@@ -112,106 +116,31 @@ class Music(commands.Cog):
             await ctx.send("There are no channels for me to leave from!")
         else:
             # Assuming the bot will only every be in one voice channel at most
+            self.bot.voice_clients[0].stop()
             self.playing_queue = []
             await ctx.send(random.choice(LEAVE_MESSAGES))
             await self.bot.voice_clients[0].disconnect()
 
-    @commands.command(aliases=["q"], help="Add a track to the queue")
-    async def queue(self, ctx: commands.Context, *args: str) -> None:
-        """ Command to add items to the queue """
-        # TODO: Add functionality to view the queue
-        # Currently we instantly download anything that is added to queue.
-        # Can likely be made more efficient
-        if len(args) == 0:
-            # queue_embed = discord.Embed(description=self.format_queue())
-            await ctx.send(self.format_queue())
-            return
-        self.download_audio(args, ctx.author.display_name)
-        await ctx.send(embed=queue_message(*self.playing_queue[-1][1:4]))
+    @staticmethod
+    def bool_to_emoji(bool_val: bool) -> str:
+        """ Converts a boolean value into an emoji """
+        if bool_val:
+            return "✅"
+        else:
+            return "❌"
 
-    @commands.command(aliases=["clearqueue", "cq"])
-    async def clear_queue(self, ctx):
-        self.playing_queue = []
-        await ctx.send("Queue cleared")
+    @commands.command(aliases=["lt"], help="Loop the current track")
+    async def looptrack(self, ctx: commands.Context) -> None:
+        """ Command to loop the current track (or the first one in queue) """
+        self.loop_track = not self.loop_track
+        await ctx.send("Looping track: " + self.bool_to_emoji(self.loop_track))
 
-    @commands.command(aliases=["p"], help="Get Melody to play something")
-    async def play(self, ctx: commands.Context, *args: str) -> None:
-        """Command to play something in a voice client"""
-
-        if not self.bot_in_vc():
-            # If the bot is not in any voice channels,
-            # it joins the appropriate one
-            await self.join(ctx)
-
-        client = self.bot.voice_clients[0]
-
-        if client.is_paused():
-            await self.resume(ctx)
-            return
-
-        if client.is_playing():
-            # If bot is already playing, we simply add to queue
-            await self.queue(ctx, *args)
-            return
-
-        if len(self.playing_queue) == 0:
-            # Ensure that there is something in the queue
-            await self.queue(ctx, *args)
-
-        audio_data = self.playing_queue[0]
-        self.play_song(ctx, client, audio_data)
-
-    def play_song(self, ctx: commands.Context,
-                  client: discord.VoiceClient,
-                  audio_data: Tuple) -> None:
-        """
-        Plays the song in audio_data in client and sends a message to the
-        channel relaying this information
-        :param ctx: context of request
-        :param client: VoiceClient where track is to be played
-        :param audio_data: Tuple containing information about the track
-        (see self.playing_queue for details)
-        :return: None
-        """
-
-        def after_playing(error):
-            self.playing_queue.pop(0)
-            if len(self.playing_queue) > 0:
-                # Play next song if available
-                self.play_song(ctx, client, self.playing_queue[0])
-
-        asyncio.run_coroutine_threadsafe(
-            ctx.send(embed=playing_message(*audio_data[1:4])),
-            self.bot.loop
-        )
-
-        client.play(audio_data[0], after=after_playing)
-
-    def download_audio(self, search_args: Tuple[str], requester: str) -> None:
-        """
-        This method downloads the result from search_args and saves it and
-        its information to self.playing_queue
-        :param search_args: Search arguments as provided by user
-        :param requester: Discord (nick)name of requester
-        :return: None
-        """
-        query_results = yt_search(" ".join(search_args))
-
-        if query_results is None:
-            # Make sure search actually returned something
-            return
-
-        source = query_results["source"]
-        # download audio and save it and its information in self.playing_queue
-        self.playing_queue.append(
-            (
-                discord.FFmpegPCMAudio(source, **self.FFMPEG_OPTIONS),
-                query_results["title"],
-                query_results["url"],
-                requester,
-                query_results["duration"]
-            )
-        )
+    @commands.command(aliases=["loop", "l", "loopqueue", "lq"],
+                      help="Loop the queue")
+    async def loop_command(self, ctx: commands.Context) -> None:
+        """ Command to loop the queue in order """
+        self.loop = not self.loop
+        await ctx.send("Queue loop: " + self.bool_to_emoji(self.loop))
 
     @commands.command(help="Pause whatever Melody is playing")
     async def pause(self, ctx: commands.Context) -> None:
@@ -237,3 +166,103 @@ class Music(commands.Cog):
 
         channel.resume()
         await ctx.send("**Playing resumed** :arrow_forward:")
+
+    @commands.command(aliases=["clearqueue", "cq"], help="Clear queue")
+    async def clear_queue(self, ctx: commands.Context):
+        """ Commands to clear the queue """
+        self.bot.voice_clients[0].stop()
+        self.playing_queue = []
+        await ctx.send("Queue cleared")
+
+    @commands.command(aliases=["q"], help="Add a track to the queue")
+    async def queue(self, ctx: commands.Context, *args: str) -> None:
+        """ Command to add items to the queue """
+        # Currently we instantly download anything that is added to queue.
+        # Can likely be made more efficient
+        if len(args) == 0:
+            # queue_embed = discord.Embed(description=self.format_queue())
+            await ctx.send(self.format_queue())
+            return
+        self.download_audio(args, ctx.author.display_name)
+        await ctx.send(embed=queue_message(*self.playing_queue[-1][1:4]))
+
+    @commands.command(aliases=["p"], help="Get Melody to play something")
+    async def play(self, ctx: commands.Context, *args: str) -> None:
+        """Command to play something in a voice client"""
+
+        if not self.bot_in_vc():
+            # If the bot is not in any voice channels,
+            # it joins the appropriate one
+            await self.join(ctx)
+
+        client = self.bot.voice_clients[0]
+
+        if client.is_paused():
+            await self.resume(ctx)
+            return
+
+        if client.is_playing():
+            # If bot is already playing, we simply add to queue
+            await self.queue(ctx, *args)
+            return
+
+        if len(self.playing_queue) == 0:
+            # Ensure that there is something in the queue
+            await self.queue(ctx, *args)
+
+        self.play_song(ctx, client, self.playing_queue[0])
+
+    def play_song(self, ctx: commands.Context,
+                  client: discord.VoiceClient,
+                  audio_data: Tuple) -> None:
+        """
+        Plays the song in audio_data in client and sends a message to the
+        channel relaying this information
+        :param ctx: context of request
+        :param client: VoiceClient where track is to be played
+        :param audio_data: Tuple containing information about the track
+        (see self.playing_queue for details)
+        :return: None
+        """
+
+        def after_playing(error):
+            if not self.loop_track:
+                track_data = self.playing_queue.pop(0)
+                if self.loop:
+                    self.playing_queue.append(track_data)
+
+            if len(self.playing_queue) > 0:
+                # Play next song if available
+                self.play_song(ctx, client, self.playing_queue[0])
+
+        asyncio.run_coroutine_threadsafe(
+            ctx.send(embed=playing_message(*audio_data[1:4])),
+            self.bot.loop
+        )
+        source = discord.FFmpegPCMAudio(audio_data[0], **self.FFMPEG_OPTIONS)
+        client.play(source, after=after_playing)
+
+    def download_audio(self, search_args: Tuple[str], requester: str) -> None:
+        """
+        This method downloads the result from search_args and saves it and
+        its information to self.playing_queue
+        :param search_args: Search arguments as provided by user
+        :param requester: Discord (nick)name of requester
+        :return: None
+        """
+        query_results = yt_search(" ".join(search_args))
+
+        if query_results is None:
+            # Make sure search actually returned something
+            return
+
+        # download audio and save it and its information in self.playing_queue
+        self.playing_queue.append(
+            (
+                query_results["source"],
+                query_results["title"],
+                query_results["url"],
+                requester,
+                query_results["duration"]
+            )
+        )
