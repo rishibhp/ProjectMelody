@@ -6,7 +6,7 @@ import os
 load_dotenv("token.env")
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
-bot = commands.Bot(command_prefix="!")
+bot = commands.Bot(command_prefix="?")
 
 bot.add_cog(Music(bot))
 
