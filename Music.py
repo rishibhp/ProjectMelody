@@ -69,8 +69,15 @@ class Music(commands.Cog):
         # 4. Integer representing length of track in seconds
         self.playing_queue = []
 
-    def bot_in_vc(self):
-        return len(self.bot.voice_clients) > 0
+    def bot_in_vc(self, ctx: commands.Context):
+        author_guild_id = ctx.author.guild.id
+        for voice_client in self.bot.voice_clients:
+            voice_client_guild_id = voice_client.guild.id
+            if author_guild_id == voice_client_guild_id:
+                return True
+        return False
+        # print(self.bot.voice_clients)
+        # return len(self.bot.voice_clients) > 0
 
     def format_queue(self) -> str:
         if len(self.playing_queue) == 0:
@@ -107,21 +114,21 @@ class Music(commands.Cog):
     @commands.command(help="Have Melody join a voice channel")
     async def join(self, ctx: commands.Context) -> None:
         """Command to have bot join the voice channel that the user is in"""
-        if self.bot_in_vc():
+        if ctx.author.voice is None:
+            # Making sure that the user themself is in a voice channel
+            await ctx.send("Please join one of the voice channels first!")
+        elif self.bot_in_vc(ctx):
             # Indicates bot is already in a voice channel
             await ctx.send("This bot is already in use!")
-        elif ctx.author.voice is not None:
-            # Making sure that the user themself is in a voice channel
+        else:
             channel = ctx.author.voice.channel
             await channel.connect()
-        else:
-            await ctx.send("Please join one of the voice channels first!")
 
     @commands.command(aliases=["disconnect"],
                       help="Have Melody leave a voice channel")
     async def leave(self, ctx: commands.Context) -> None:
         """ Command to have bot leave a voice channel"""
-        if not self.bot_in_vc():
+        if not self.bot_in_vc(ctx):
             await ctx.send("There are no channels for me to leave from!")
         else:
             ctx.voice_client.pause()
@@ -159,7 +166,7 @@ class Music(commands.Cog):
     @commands.command(help="Pause whatever Melody is playing")
     async def pause(self, ctx: commands.Context) -> None:
         """Command to pause what is playing"""
-        if not self.bot_in_vc():
+        if not self.bot_in_vc(ctx):
             await ctx.send("I don't think I was playing anything, "
                            "but I'll stop anyway :persevere:")
             return
@@ -170,7 +177,7 @@ class Music(commands.Cog):
     @commands.command(help="Have Melody resume playing")
     async def resume(self, ctx: commands.Context) -> None:
         """Command to resume playing"""
-        if not self.bot_in_vc():
+        if not self.bot_in_vc(ctx):
             await ctx.send("Um I don't think I am in a vc? "
                            "But um I guess I will continue playing silence")
             return
@@ -215,7 +222,7 @@ class Music(commands.Cog):
     @commands.command(help="Pause whatever Melody is playing")
     async def pause(self, ctx: commands.Context) -> None:
         """Command to pause what is playing"""
-        if not self.bot_in_vc():
+        if not self.bot_in_vc(ctx):
             await ctx.send("I don't think I was playing anything, "
                            "but I'll stop anyway :persevere:")
             return
@@ -227,7 +234,7 @@ class Music(commands.Cog):
     @commands.command(help="Have Melody resume playing")
     async def resume(self, ctx: commands.Context) -> None:
         """Command to resume playing"""
-        if not self.bot_in_vc():
+        if not self.bot_in_vc(ctx):
             await ctx.send("Um I don't think I am in a vc? "
                            "But um I guess I will continue playing silence")
             return
@@ -259,7 +266,7 @@ class Music(commands.Cog):
     async def play(self, ctx: commands.Context, *args: str) -> None:
         """Command to play something in a voice client"""
 
-        if not self.bot_in_vc():
+        if not self.bot_in_vc(ctx):
             # If the bot is not in any voice channels,
             # it joins the appropriate one
             await self.join(ctx)
