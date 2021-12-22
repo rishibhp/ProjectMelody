@@ -233,10 +233,17 @@ class Music(commands.Cog):
         :param ctx: context of the request
         :param pos: the index of the queue to be jumped to
         """
-        # TODO: pos requires testing (needs to be a valid index)
-        ctx.voice_client.pause()
-        pos = int(pos)
+        try:
+            pos = int(pos)
+        except ValueError:
+            await ctx.send(pos + " could not be understood as a number")
+            return
 
+        if pos < 1 or pos > len(self.playing_queue):
+            await ctx.send(str(pos) + " is not a valid index")
+            return
+
+        ctx.voice_client.pause()
         self.playing_queue = self.playing_queue[pos - 1:]
         self.play_song(ctx, self.playing_queue[0])
 
