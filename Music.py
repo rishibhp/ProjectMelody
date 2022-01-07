@@ -192,7 +192,8 @@ class Music(commands.Cog):
         """
         ctx.voice_client.pause()
         random.shuffle(self.playing_queue)
-        self.play_song(ctx, self.playing_queue[0])
+        if self.playing_queue != []:
+            self.play_song(ctx, self.playing_queue[0])
 
     @commands.command(help="Pause whatever Melody is playing")
     async def pause(self, ctx: commands.Context) -> None:
@@ -245,7 +246,8 @@ class Music(commands.Cog):
 
         ctx.voice_client.pause()
         self.playing_queue = self.playing_queue[pos - 1:]
-        self.play_song(ctx, self.playing_queue[0])
+        if self.playing_queue != []:
+            self.play_song(ctx, self.playing_queue[0])
 
     @commands.command(name="clearqueue", aliases=["cq"], help="Clear queue")
     async def clear_queue(self, ctx: commands.Context):
@@ -351,7 +353,8 @@ class Music(commands.Cog):
             # Ensure that there is something in the queue
             await self.queue(ctx, *args)
 
-        self.play_song(ctx, self.playing_queue[0])
+        if self.playing_queue != []:
+            self.play_song(ctx, self.playing_queue[0])
 
     def play_song(self, ctx: commands.Context,
                   audio_data: Tuple) -> None:
@@ -369,7 +372,7 @@ class Music(commands.Cog):
             """
             if isinstance(error, IndexError):
                 return
-            if not self.loop_track:
+            if not self.loop_track and self.playing_queue != []:
                 track_data = self.playing_queue.pop(0)
                 if self.loop:
                     self.playing_queue.append(track_data)
@@ -383,7 +386,10 @@ class Music(commands.Cog):
             self.bot.loop
         )
         source = discord.FFmpegPCMAudio(audio_data[0], **self.FFMPEG_OPTIONS)
-        client.play(source, after=after_playing)
+        # This fixes the occasional AttributeError: "NoneType" object
+        # has no attribute "play"
+        if client is not None:
+            client.play(source, after=after_playing)
 
     def download_audio(self, search_args: Tuple[str], requester: str) -> None:
         """
