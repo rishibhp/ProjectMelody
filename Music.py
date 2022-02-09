@@ -70,6 +70,7 @@ class Music(commands.Cog):
         # 3. String object for the requester's nickname
         # 4. Integer representing length of track in seconds
         self.playing_queue = []
+        self.queue_index = 0
 
     def bot_in_vc(self, ctx: commands.Context):
         """Return whether the music bot is already in a voice channel. Notice that using this bot
@@ -155,6 +156,7 @@ class Music(commands.Cog):
             ctx.voice_client.pause()
             await ctx.voice_client.disconnect(force=False)
             self.playing_queue = []  # reset queue
+            self.queue_index = 0
             await ctx.send(random.choice(LEAVE_MESSAGES))
 
     @staticmethod
@@ -244,8 +246,9 @@ class Music(commands.Cog):
             return
 
         ctx.voice_client.pause()
-        self.playing_queue = self.playing_queue[pos - 1:]
-        self.play_song(ctx, self.playing_queue[0])
+        self.queue_index = pos - 1
+        print(pos - 1)
+        self.play_song(ctx, self.playing_queue[self.queue_index])
 
     @commands.command(name="clearqueue", aliases=["cq"], help="Clear queue")
     async def clear_queue(self, ctx: commands.Context):
@@ -347,11 +350,11 @@ class Music(commands.Cog):
             await self.queue(ctx, *args)
             return
 
-        if len(self.playing_queue) == 0:
+        if len(self.playing_queue) == self.queue_index:
             # Ensure that there is something in the queue
             await self.queue(ctx, *args)
 
-        self.play_song(ctx, self.playing_queue[0])
+        self.play_song(ctx, self.playing_queue[self.queue_index])
 
     def play_song(self, ctx: commands.Context,
                   audio_data: Tuple) -> None:
@@ -370,13 +373,14 @@ class Music(commands.Cog):
             if isinstance(error, IndexError):
                 return
             if not self.loop_track:
-                track_data = self.playing_queue.pop(0)
-                if self.loop:
-                    self.playing_queue.append(track_data)
+                self.queue_index += 1
 
-            if len(self.playing_queue) > 0:
+            if self.loop and self.queue_index >= len(self.playing_queue):
+                self.queue_index = 0
+
+            if self.queue_index < len(self.playing_queue):
                 # Play next song if available
-                self.play_song(ctx, self.playing_queue[0])
+                self.play_song(ctx, self.playing_queue[self.queue_index])
 
         asyncio.run_coroutine_threadsafe(
             ctx.send(embed=playing_message(*audio_data[1:4])),
