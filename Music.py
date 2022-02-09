@@ -194,7 +194,8 @@ class Music(commands.Cog):
         """
         ctx.voice_client.pause()
         random.shuffle(self.playing_queue)
-        self.play_song(ctx, self.playing_queue[0])
+        if self.playing_queue != []:
+            self.play_song(ctx, self.playing_queue[0])
 
     @commands.command(help="Pause whatever Melody is playing")
     async def pause(self, ctx: commands.Context) -> None:
@@ -247,7 +248,6 @@ class Music(commands.Cog):
 
         ctx.voice_client.pause()
         self.queue_index = pos - 1
-        print(pos - 1)
         self.play_song(ctx, self.playing_queue[self.queue_index])
 
     @commands.command(name="clearqueue", aliases=["cq"], help="Clear queue")
@@ -372,6 +372,7 @@ class Music(commands.Cog):
             """
             if isinstance(error, IndexError):
                 return
+              
             if not self.loop_track:
                 self.queue_index += 1
 
@@ -387,7 +388,10 @@ class Music(commands.Cog):
             self.bot.loop
         )
         source = discord.FFmpegPCMAudio(audio_data[0], **self.FFMPEG_OPTIONS)
-        client.play(source, after=after_playing)
+        # This fixes the occasional AttributeError: "NoneType" object
+        # has no attribute "play"
+        if client is not None:
+            client.play(source, after=after_playing)
 
     def download_audio(self, search_args: Tuple[str], requester: str) -> None:
         """
