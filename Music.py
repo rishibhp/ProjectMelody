@@ -230,7 +230,7 @@ class Music(commands.Cog):
         if self.queue_index == len(self.playing_queue) - 1:
             ctx.voice_client.stop()
         else:
-            await self.jump(ctx, str(self.queue_index + 1))
+            await self.jump(ctx, str(self.queue_index + 2))
 
     @commands.command(aliases=["j"])
     async def jump(self, ctx: commands.Context, pos: str) -> None:
