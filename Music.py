@@ -227,7 +227,7 @@ class Music(commands.Cog):
         """Command to skip the current track.
         :param ctx: context of the request
         """
-        if self.queue_index == len(self.queue) - 1:
+        if self.queue_index == len(self.playing_queue) - 1:
             ctx.voice_client.stop()
         else:
             await self.jump(ctx, str(self.queue_index + 1))
